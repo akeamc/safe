@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT cert, private_key AS \"private_key: Json<AeadSssContainer>\" FROM issuers WHERE identifier = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "cert",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "private_key: Json<AeadSssContainer>",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "27671cc8a0bddfd417e221cf6bd55106eb433dd60db1e1b6faa48d7c41df2565"
+}

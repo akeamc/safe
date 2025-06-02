@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT identifier, cert FROM issuers",
+  "describe": {
+    "columns": [
+      {
+        "name": "identifier",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "cert",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "ce3c5888fb4d684fcd3ceb68be1b7e3eac3903bdd75ce087523e274fb8505282"
+}

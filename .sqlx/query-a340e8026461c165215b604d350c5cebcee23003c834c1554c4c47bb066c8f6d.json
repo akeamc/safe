@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT crl FROM issuers WHERE identifier = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "crl",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "a340e8026461c165215b604d350c5cebcee23003c834c1554c4c47bb066c8f6d"
+}

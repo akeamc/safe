@@ -1,0 +1,37 @@
+[package]
+name = "safe"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+axum = "0.8.4"
+chacha20poly1305 = "0.10.1"
+clap = { version = "4.5.39", features = ["env", "derive"] }
+dotenvy = "0.15.7"
+generic-array = "0.14.7"
+hex = { version = "0.4.3", features = ["serde"] }
+prost = "0.13.5"
+rand = "0.9.1"
+rcgen = { version = "0.14.0", features = [
+    "x509-parser",
+], git = "https://github.com/rustls/rcgen" }
+rustls-pki-types = { version = "1.12.0", features = ["std"] }
+secrecy = "0.10.3"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+serde_with = { version = "3.12.0", features = ["hex"] }
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"] }
+ssss = "0.2.1"
+thiserror = "2.0.12"
+time = { version = "0.3.41", features = ["serde"] }
+tokio = { version = "1.45.1", features = ["full"] }
+tokio-util = { version = "0.7.15", features = ["rt"] }
+tonic = "0.13.1"
+tonic-reflection = "0.13.1"
+tracing = "0.1.41"
+x509-parser = "0.17.0"
+zeroize = { version = "1.8.1", features = ["std"] }
+
+[build-dependencies]
+tonic-build = "*"

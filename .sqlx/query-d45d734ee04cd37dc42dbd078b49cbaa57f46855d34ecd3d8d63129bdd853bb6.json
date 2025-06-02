@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT serial_number AS \"serial_number: CertSerial\" FROM certificates WHERE issuer = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "serial_number: CertSerial",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d45d734ee04cd37dc42dbd078b49cbaa57f46855d34ecd3d8d63129bdd853bb6"
+}

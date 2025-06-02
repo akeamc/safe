@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE issuers SET private_key = $1 WHERE identifier = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6b482c0b32ba2fd29b14f47400953897ec70a60d5e6707e41844b3699c2f433f"
+}

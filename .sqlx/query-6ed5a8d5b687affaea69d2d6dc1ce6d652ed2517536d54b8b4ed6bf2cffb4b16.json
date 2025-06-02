@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT private_key as \"private_key: Json<AeadSssContainer>\"\n        FROM issuers\n        WHERE identifier = $1\n    ",
+  "describe": {
+    "columns": [
+      {
+        "name": "private_key: Json<AeadSssContainer>",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6ed5a8d5b687affaea69d2d6dc1ce6d652ed2517536d54b8b4ed6bf2cffb4b16"
+}

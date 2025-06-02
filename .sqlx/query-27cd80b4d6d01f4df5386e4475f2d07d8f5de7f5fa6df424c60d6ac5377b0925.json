@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT cert FROM issuers WHERE identifier = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "cert",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "27cd80b4d6d01f4df5386e4475f2d07d8f5de7f5fa6df424c60d6ac5377b0925"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE issuers SET crl = $1 WHERE identifier = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "3440d181f5b54eb42859e9064929a7dec73438e8308d6dec0ba01b74fc8ee408"
+}

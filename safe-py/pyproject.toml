@@ -1,0 +1,30 @@
+[project]
+name = "safe"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [{ name = "Åke Amcoff", email = "ake@amcoff.net" }]
+requires-python = ">=3.12"
+dependencies = ["cryptography>=45.0.3"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+lint.extend-select = ["I"]
+extend-exclude = ["safe_pb2_grpc.py", "safe_pb2.py"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+ignore = [
+    "src/safe/stubs/safe_pb2_grpc.py",
+    "src/safe/stubs/safe_pb2.py",
+] # Ignore generated files
+
+[dependency-groups]
+dev = [
+    "grpcio-tools>=1.72.1",
+    "mypy-protobuf>=3.6.0",
+]

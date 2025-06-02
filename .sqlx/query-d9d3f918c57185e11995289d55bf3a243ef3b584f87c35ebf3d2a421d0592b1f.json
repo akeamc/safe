@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issuers (identifier, cert, private_key) VALUES ($1, $2, $3) RETURNING identifier, cert",
+  "describe": {
+    "columns": [
+      {
+        "name": "identifier",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "cert",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "d9d3f918c57185e11995289d55bf3a243ef3b584f87c35ebf3d2a421d0592b1f"
+}

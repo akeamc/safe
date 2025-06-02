@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package safe;
+
+service Safe {
+  rpc ListIssuers (ListIssuersRequest) returns (IssuerList);
+
+  rpc CreateIssuer (CreateIssuerRequest) returns (CreateIssuerResponse);
+
+  // The client secrets do not directly stem from the issuer's private key, but
+  // form a symmetric key that in turn encrypts the private key. This allows us
+  // to roll the client secrets.
+  rpc RollClientSecrets (RollClientSecretsRequest) returns (RollClientSecretsResponse);
+
+  rpc UpdateCrl (UpdateCrlRequest) returns (UpdateCrlResponse);
+
+  rpc SignCertificate (SignCertificateRequest) returns (SignCertificateResponse);
+
+  rpc ListCertificates (ListCertificatesRequest) returns (ListCertificatesResponse);
+}
+
+message ListIssuersRequest {}
+
+message IssuerList {
+  repeated IssuerInfo issuers = 1;
+}
+
+message CreateIssuerRequest {
+    string identifier = 1;
+    string cert = 2;
+    string private_key = 3;
+    optional uint32 n_client_secrets = 4;
+}
+
+message CreateIssuerResponse {
+    string identifier = 1;
+    string cert = 2;
+    repeated string client_secrets = 3;
+}
+
+message IssuerInfo {
+  string identifier = 1;
+  // PEM-encoded certificate
+  string cert = 2;
+}
+
+message RollClientSecretsRequest {
+  string issuer = 1;
+  string secret = 2;
+  optional uint32 n_client_secrets = 3;
+}
+
+message RollClientSecretsResponse {
+  repeated string client_secrets = 1;
+}
+
+message UpdateCrlRequest {
+  string issuer = 1;
+  string secret = 2;
+}
+
+message UpdateCrlResponse {}
+
+message SignCertificateRequest {
+  string issuer = 1;
+  bytes spki = 2;
+  string secret = 3;
+}
+
+message SignCertificateResponse {
+  bytes der = 1;
+}
+
+message ListCertificatesRequest {
+  string issuer = 1;
+}
+
+message ListCertificatesResponse {
+  repeated string certificates = 1;
+}
