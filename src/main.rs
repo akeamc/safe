@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use clap::Parser;
 use safe::{State, grpc::SafeService};
-use sqlx::SqlitePool;
+use sqlx::{Sqlite, SqlitePool, migrate::MigrateDatabase};
 use tokio::{signal, task::JoinSet};
 use tokio_util::sync::CancellationToken;
 
@@ -28,6 +28,12 @@ async fn main() -> anyhow::Result<()> {
         grpc_addr,
         database_url,
     } = Args::parse();
+
+    if !Sqlite::database_exists(&database_url).await? {
+        eprintln!("Creating database {}", &database_url);
+        Sqlite::create_database(&database_url).await?;
+        eprintln!("Database created successfully");
+    }
 
     let db = SqlitePool::connect(&database_url).await?;
 
