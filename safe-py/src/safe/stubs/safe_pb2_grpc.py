@@ -59,6 +59,11 @@ class SafeStub(object):
                 request_serializer=safe_dot_stubs_dot_safe__pb2.SignCertificateRequest.SerializeToString,
                 response_deserializer=safe_dot_stubs_dot_safe__pb2.SignCertificateResponse.FromString,
                 _registered_method=True)
+        self.RevokeCertificate = channel.unary_unary(
+                '/safe.Safe/RevokeCertificate',
+                request_serializer=safe_dot_stubs_dot_safe__pb2.RevokeCertificateRequest.SerializeToString,
+                response_deserializer=safe_dot_stubs_dot_safe__pb2.RevokeCertificateResponse.FromString,
+                _registered_method=True)
         self.ListCertificates = channel.unary_unary(
                 '/safe.Safe/ListCertificates',
                 request_serializer=safe_dot_stubs_dot_safe__pb2.ListCertificatesRequest.SerializeToString,
@@ -102,6 +107,12 @@ class SafeServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RevokeCertificate(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ListCertificates(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -135,6 +146,11 @@ def add_SafeServicer_to_server(servicer, server):
                     servicer.SignCertificate,
                     request_deserializer=safe_dot_stubs_dot_safe__pb2.SignCertificateRequest.FromString,
                     response_serializer=safe_dot_stubs_dot_safe__pb2.SignCertificateResponse.SerializeToString,
+            ),
+            'RevokeCertificate': grpc.unary_unary_rpc_method_handler(
+                    servicer.RevokeCertificate,
+                    request_deserializer=safe_dot_stubs_dot_safe__pb2.RevokeCertificateRequest.FromString,
+                    response_serializer=safe_dot_stubs_dot_safe__pb2.RevokeCertificateResponse.SerializeToString,
             ),
             'ListCertificates': grpc.unary_unary_rpc_method_handler(
                     servicer.ListCertificates,
@@ -277,6 +293,33 @@ class Safe(object):
             '/safe.Safe/SignCertificate',
             safe_dot_stubs_dot_safe__pb2.SignCertificateRequest.SerializeToString,
             safe_dot_stubs_dot_safe__pb2.SignCertificateResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RevokeCertificate(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/safe.Safe/RevokeCertificate',
+            safe_dot_stubs_dot_safe__pb2.RevokeCertificateRequest.SerializeToString,
+            safe_dot_stubs_dot_safe__pb2.RevokeCertificateResponse.FromString,
             options,
             channel_credentials,
             insecure,

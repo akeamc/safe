@@ -1,29 +1,53 @@
 import grpc
-from cryptography.hazmat.primitives import serialization
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.x509 import load_der_x509_certificate
 
 from safe.stubs import safe_pb2, safe_pb2_grpc
 
-issuer = "hellothere2"
-secret = "ZFlAzk57MC2lx6:y4terIStio69SYopvbdTsvDPX94b0a39uvX8m38N9RzgSiUb1oxS5iJ2"
+issuer = "my-issuer"
+secret = "Dmra2AFQRPzyM8:12iHei7AvUFqkrXqcjkDd7GC1oaVJvOivZqWhEpYEuipjJOLYlpPa2Z2"
 
 channel = grpc.insecure_channel("localhost:8001")
 stub = safe_pb2_grpc.SafeStub(channel)
 
-private_key = ec.generate_private_key(ec.SECP384R1())
-spki = private_key.public_key().public_bytes(
-    encoding=serialization.Encoding.DER,
-    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+key = ec.generate_private_key(ec.SECP256R1())
+csr = (
+    x509.CertificateSigningRequestBuilder()
+    .subject_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, "🍃")]))
+    .sign(key, hashes.SHA256())
 )
+
 cert = stub.SignCertificate(
     safe_pb2.SignCertificateRequest(
         issuer=issuer,
         secret=secret,
-        spki=spki,
+        csr=csr.public_bytes(encoding=serialization.Encoding.DER),
     )
 )
 
-cert = load_der_x509_certificate(cert.der)
+cert = x509.load_der_x509_certificate(cert.der)
 
-print("Certificate:", cert.subject)
+# colon-separated hexadecimal representation of the serial number
+serial_hex = cert.serial_number.to_bytes(
+    (cert.serial_number.bit_length() + 7) // 8, "big"
+).hex()
+serial_hex = ":".join(serial_hex[i : i + 2] for i in range(0, len(serial_hex), 2))
+
+stub.RevokeCertificate(
+    safe_pb2.RevokeCertificateRequest(
+        issuer=issuer,
+        secret=secret,
+        serial=serial_hex,
+        reason=safe_pb2.RevocationReason.SUPERSEDED,
+        # reason_code=safe_pb2.RevocationReason.KEY_COMPROMISE,
+        # invalidity_date=dt.datetime.now(dt.timezone.utc).isoformat(),
+    )
+)
+
+# stub.UpdateCrl(
+#   safe_pb2.UpdateCrlRequest(
+#     secret=secret,
+#     issuer=issuer,
+#   )
+# )

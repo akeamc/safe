@@ -22,41 +22,48 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15safe/stubs/safe.proto\x12\x04safe\"\x14\n\x12ListIssuersRequest\"/\n\nIssuerList\x12!\n\x07issuers\x18\x01 \x03(\x0b\x32\x10.safe.IssuerInfo\"\x80\x01\n\x13\x43reateIssuerRequest\x12\x12\n\nidentifier\x18\x01 \x01(\t\x12\x0c\n\x04\x63\x65rt\x18\x02 \x01(\t\x12\x13\n\x0bprivate_key\x18\x03 \x01(\t\x12\x1d\n\x10n_client_secrets\x18\x04 \x01(\rH\x00\x88\x01\x01\x42\x13\n\x11_n_client_secrets\"P\n\x14\x43reateIssuerResponse\x12\x12\n\nidentifier\x18\x01 \x01(\t\x12\x0c\n\x04\x63\x65rt\x18\x02 \x01(\t\x12\x16\n\x0e\x63lient_secrets\x18\x03 \x03(\t\".\n\nIssuerInfo\x12\x12\n\nidentifier\x18\x01 \x01(\t\x12\x0c\n\x04\x63\x65rt\x18\x02 \x01(\t\"n\n\x18RollClientSecretsRequest\x12\x0e\n\x06issuer\x18\x01 \x01(\t\x12\x0e\n\x06secret\x18\x02 \x01(\t\x12\x1d\n\x10n_client_secrets\x18\x03 \x01(\rH\x00\x88\x01\x01\x42\x13\n\x11_n_client_secrets\"3\n\x19RollClientSecretsResponse\x12\x16\n\x0e\x63lient_secrets\x18\x01 \x03(\t\"2\n\x10UpdateCrlRequest\x12\x0e\n\x06issuer\x18\x01 \x01(\t\x12\x0e\n\x06secret\x18\x02 \x01(\t\"\x13\n\x11UpdateCrlResponse\"F\n\x16SignCertificateRequest\x12\x0e\n\x06issuer\x18\x01 \x01(\t\x12\x0c\n\x04spki\x18\x02 \x01(\x0c\x12\x0e\n\x06secret\x18\x03 \x01(\t\"&\n\x17SignCertificateResponse\x12\x0b\n\x03\x64\x65r\x18\x01 \x01(\x0c\")\n\x17ListCertificatesRequest\x12\x0e\n\x06issuer\x18\x01 \x01(\t\"0\n\x18ListCertificatesResponse\x12\x14\n\x0c\x63\x65rtificates\x18\x01 \x03(\t2\xbf\x03\n\x04Safe\x12\x39\n\x0bListIssuers\x12\x18.safe.ListIssuersRequest\x1a\x10.safe.IssuerList\x12\x45\n\x0c\x43reateIssuer\x12\x19.safe.CreateIssuerRequest\x1a\x1a.safe.CreateIssuerResponse\x12T\n\x11RollClientSecrets\x12\x1e.safe.RollClientSecretsRequest\x1a\x1f.safe.RollClientSecretsResponse\x12<\n\tUpdateCrl\x12\x16.safe.UpdateCrlRequest\x1a\x17.safe.UpdateCrlResponse\x12N\n\x0fSignCertificate\x12\x1c.safe.SignCertificateRequest\x1a\x1d.safe.SignCertificateResponse\x12Q\n\x10ListCertificates\x12\x1d.safe.ListCertificatesRequest\x1a\x1e.safe.ListCertificatesResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15safe/stubs/safe.proto\x12\x04safe\x1a\x1fgoogle/protobuf/timestamp.proto\"\x14\n\x12ListIssuersRequest\"/\n\nIssuerList\x12!\n\x07issuers\x18\x01 \x03(\x0b\x32\x10.safe.IssuerInfo\"\x80\x01\n\x13\x43reateIssuerRequest\x12\x12\n\nidentifier\x18\x01 \x01(\t\x12\x0c\n\x04\x63\x65rt\x18\x02 \x01(\t\x12\x13\n\x0bprivate_key\x18\x03 \x01(\t\x12\x1d\n\x10n_client_secrets\x18\x04 \x01(\rH\x00\x88\x01\x01\x42\x13\n\x11_n_client_secrets\"P\n\x14\x43reateIssuerResponse\x12\x12\n\nidentifier\x18\x01 \x01(\t\x12\x0c\n\x04\x63\x65rt\x18\x02 \x01(\t\x12\x16\n\x0e\x63lient_secrets\x18\x03 \x03(\t\".\n\nIssuerInfo\x12\x12\n\nidentifier\x18\x01 \x01(\t\x12\x0c\n\x04\x63\x65rt\x18\x02 \x01(\t\"n\n\x18RollClientSecretsRequest\x12\x0e\n\x06issuer\x18\x01 \x01(\t\x12\x0e\n\x06secret\x18\x02 \x01(\t\x12\x1d\n\x10n_client_secrets\x18\x03 \x01(\rH\x00\x88\x01\x01\x42\x13\n\x11_n_client_secrets\"3\n\x19RollClientSecretsResponse\x12\x16\n\x0e\x63lient_secrets\x18\x01 \x03(\t\"2\n\x10UpdateCrlRequest\x12\x0e\n\x06issuer\x18\x01 \x01(\t\x12\x0e\n\x06secret\x18\x02 \x01(\t\"\x13\n\x11UpdateCrlResponse\"\xcb\x01\n\x16SignCertificateRequest\x12\x0e\n\x06issuer\x18\x01 \x01(\t\x12\x0e\n\x06secret\x18\x02 \x01(\t\x12\x0b\n\x03\x63sr\x18\x03 \x01(\x0c\x12\x33\n\nnot_before\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.TimestampH\x00\x88\x01\x01\x12\x32\n\tnot_after\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampH\x01\x88\x01\x01\x42\r\n\x0b_not_beforeB\x0c\n\n_not_after\"&\n\x17SignCertificateResponse\x12\x0b\n\x03\x64\x65r\x18\x01 \x01(\x0c\"\x82\x01\n\x18RevokeCertificateRequest\x12\x0e\n\x06issuer\x18\x01 \x01(\t\x12\x0e\n\x06secret\x18\x02 \x01(\t\x12\x0e\n\x06serial\x18\x03 \x01(\t\x12+\n\x06reason\x18\x04 \x01(\x0e\x32\x16.safe.RevocationReasonH\x00\x88\x01\x01\x42\t\n\x07_reason\"\x1b\n\x19RevokeCertificateResponse\")\n\x17ListCertificatesRequest\x12\x0e\n\x06issuer\x18\x01 \x01(\t\"0\n\x18ListCertificatesResponse\x12\x14\n\x0c\x63\x65rtificates\x18\x01 \x03(\t*\xe6\x01\n\x10RevocationReason\x12\x0f\n\x0bUNSPECIFIED\x10\x00\x12\x12\n\x0eKEY_COMPROMISE\x10\x01\x12\x11\n\rCA_COMPROMISE\x10\x02\x12\x17\n\x13\x41\x46\x46ILIATION_CHANGED\x10\x03\x12\x0e\n\nSUPERSEDED\x10\x04\x12\x1a\n\x16\x43\x45SSATION_OF_OPERATION\x10\x05\x12\x14\n\x10\x43\x45RTIFICATE_HOLD\x10\x06\x12\x13\n\x0fREMOVE_FROM_CRL\x10\x08\x12\x17\n\x13PRIVILEGE_WITHDRAWN\x10\t\x12\x11\n\rAA_COMPROMISE\x10\n2\x95\x04\n\x04Safe\x12\x39\n\x0bListIssuers\x12\x18.safe.ListIssuersRequest\x1a\x10.safe.IssuerList\x12\x45\n\x0c\x43reateIssuer\x12\x19.safe.CreateIssuerRequest\x1a\x1a.safe.CreateIssuerResponse\x12T\n\x11RollClientSecrets\x12\x1e.safe.RollClientSecretsRequest\x1a\x1f.safe.RollClientSecretsResponse\x12<\n\tUpdateCrl\x12\x16.safe.UpdateCrlRequest\x1a\x17.safe.UpdateCrlResponse\x12N\n\x0fSignCertificate\x12\x1c.safe.SignCertificateRequest\x1a\x1d.safe.SignCertificateResponse\x12T\n\x11RevokeCertificate\x12\x1e.safe.RevokeCertificateRequest\x1a\x1f.safe.RevokeCertificateResponse\x12Q\n\x10ListCertificates\x12\x1d.safe.ListCertificatesRequest\x1a\x1e.safe.ListCertificatesResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'safe.stubs.safe_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_LISTISSUERSREQUEST']._serialized_start=31
-  _globals['_LISTISSUERSREQUEST']._serialized_end=51
-  _globals['_ISSUERLIST']._serialized_start=53
-  _globals['_ISSUERLIST']._serialized_end=100
-  _globals['_CREATEISSUERREQUEST']._serialized_start=103
-  _globals['_CREATEISSUERREQUEST']._serialized_end=231
-  _globals['_CREATEISSUERRESPONSE']._serialized_start=233
-  _globals['_CREATEISSUERRESPONSE']._serialized_end=313
-  _globals['_ISSUERINFO']._serialized_start=315
-  _globals['_ISSUERINFO']._serialized_end=361
-  _globals['_ROLLCLIENTSECRETSREQUEST']._serialized_start=363
-  _globals['_ROLLCLIENTSECRETSREQUEST']._serialized_end=473
-  _globals['_ROLLCLIENTSECRETSRESPONSE']._serialized_start=475
-  _globals['_ROLLCLIENTSECRETSRESPONSE']._serialized_end=526
-  _globals['_UPDATECRLREQUEST']._serialized_start=528
-  _globals['_UPDATECRLREQUEST']._serialized_end=578
-  _globals['_UPDATECRLRESPONSE']._serialized_start=580
-  _globals['_UPDATECRLRESPONSE']._serialized_end=599
-  _globals['_SIGNCERTIFICATEREQUEST']._serialized_start=601
-  _globals['_SIGNCERTIFICATEREQUEST']._serialized_end=671
-  _globals['_SIGNCERTIFICATERESPONSE']._serialized_start=673
-  _globals['_SIGNCERTIFICATERESPONSE']._serialized_end=711
-  _globals['_LISTCERTIFICATESREQUEST']._serialized_start=713
-  _globals['_LISTCERTIFICATESREQUEST']._serialized_end=754
-  _globals['_LISTCERTIFICATESRESPONSE']._serialized_start=756
-  _globals['_LISTCERTIFICATESRESPONSE']._serialized_end=804
-  _globals['_SAFE']._serialized_start=807
-  _globals['_SAFE']._serialized_end=1254
+  _globals['_REVOCATIONREASON']._serialized_start=1136
+  _globals['_REVOCATIONREASON']._serialized_end=1366
+  _globals['_LISTISSUERSREQUEST']._serialized_start=64
+  _globals['_LISTISSUERSREQUEST']._serialized_end=84
+  _globals['_ISSUERLIST']._serialized_start=86
+  _globals['_ISSUERLIST']._serialized_end=133
+  _globals['_CREATEISSUERREQUEST']._serialized_start=136
+  _globals['_CREATEISSUERREQUEST']._serialized_end=264
+  _globals['_CREATEISSUERRESPONSE']._serialized_start=266
+  _globals['_CREATEISSUERRESPONSE']._serialized_end=346
+  _globals['_ISSUERINFO']._serialized_start=348
+  _globals['_ISSUERINFO']._serialized_end=394
+  _globals['_ROLLCLIENTSECRETSREQUEST']._serialized_start=396
+  _globals['_ROLLCLIENTSECRETSREQUEST']._serialized_end=506
+  _globals['_ROLLCLIENTSECRETSRESPONSE']._serialized_start=508
+  _globals['_ROLLCLIENTSECRETSRESPONSE']._serialized_end=559
+  _globals['_UPDATECRLREQUEST']._serialized_start=561
+  _globals['_UPDATECRLREQUEST']._serialized_end=611
+  _globals['_UPDATECRLRESPONSE']._serialized_start=613
+  _globals['_UPDATECRLRESPONSE']._serialized_end=632
+  _globals['_SIGNCERTIFICATEREQUEST']._serialized_start=635
+  _globals['_SIGNCERTIFICATEREQUEST']._serialized_end=838
+  _globals['_SIGNCERTIFICATERESPONSE']._serialized_start=840
+  _globals['_SIGNCERTIFICATERESPONSE']._serialized_end=878
+  _globals['_REVOKECERTIFICATEREQUEST']._serialized_start=881
+  _globals['_REVOKECERTIFICATEREQUEST']._serialized_end=1011
+  _globals['_REVOKECERTIFICATERESPONSE']._serialized_start=1013
+  _globals['_REVOKECERTIFICATERESPONSE']._serialized_end=1040
+  _globals['_LISTCERTIFICATESREQUEST']._serialized_start=1042
+  _globals['_LISTCERTIFICATESREQUEST']._serialized_end=1083
+  _globals['_LISTCERTIFICATESRESPONSE']._serialized_start=1085
+  _globals['_LISTCERTIFICATESRESPONSE']._serialized_end=1133
+  _globals['_SAFE']._serialized_start=1369
+  _globals['_SAFE']._serialized_end=1902
 # @@protoc_insertion_point(module_scope)

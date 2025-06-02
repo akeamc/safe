@@ -1,8 +1,10 @@
 use std::fmt;
 
 use generic_array::GenericArray;
+use prost_types::Timestamp;
 use serde::Deserialize;
 use serde::Serializer;
+use time::OffsetDateTime;
 
 pub mod hex_generic_array {
     use super::*;
@@ -29,16 +31,44 @@ pub mod hex_generic_array {
     }
 }
 
-pub struct ColonSeparatedHex<'a>(pub &'a [u8]);
-
-impl fmt::Display for ColonSeparatedHex<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, byte) in self.0.iter().enumerate() {
-            if i > 0 {
-                write!(f, ":")?;
-            }
-            write!(f, "{:02x}", byte)?;
+pub fn write_colon_separated_hex(bytes: &[u8], f: &mut impl fmt::Write) -> fmt::Result {
+    for (i, byte) in bytes.iter().enumerate() {
+        if i > 0 {
+            f.write_char(':')?;
         }
-        Ok(())
+        write!(f, "{:02x}", byte)?;
     }
+
+    Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ParseHexError {
+    #[error("invalid length for hex string")]
+    InvalidLength,
+    #[error("invalid character in hex string")]
+    InvalidCharacter,
+}
+
+pub fn parse_colon_separated_hex(s: &str, buf: &mut [u8]) -> Result<(), ParseHexError> {
+    let iter = s.split(':').map(|part| u8::from_str_radix(part, 16));
+
+    // ensure length matches
+    if iter.clone().count() != buf.len() {
+        return Err(ParseHexError::InvalidLength);
+    }
+
+    for (i, byte) in iter.enumerate() {
+        match byte {
+            Ok(b) => buf[i] = b,
+            Err(_) => return Err(ParseHexError::InvalidCharacter),
+        }
+    }
+
+    Ok(())
+}
+
+pub fn protobuf_to_time(timestamp: Timestamp) -> OffsetDateTime {
+    let nanos = i128::from(timestamp.seconds) * 1_000_000_000 + i128::from(timestamp.nanos);
+    OffsetDateTime::from_unix_timestamp_nanos(nanos).unwrap()
 }

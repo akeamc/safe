@@ -1,8 +1,8 @@
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 use rcgen::{
-    CertificateParams, CertificateRevocationListParams, KeyIdMethod, KeyPair, RevokedCertParams,
-    SerialNumber, SigningKey,
+    CertificateParams, CertificateRevocationListParams, KeyIdMethod, KeyPair, RevocationReason,
+    RevokedCertParams, SerialNumber, SigningKey,
 };
 use rustls_pki_types::PrivatePkcs8KeyDer;
 use secrecy::ExposeSecret;
@@ -11,15 +11,38 @@ use time::OffsetDateTime;
 use tonic::Status;
 use tracing::error;
 
-use crate::{key::AeadSssContainer, util::ColonSeparatedHex};
+use crate::{
+    key::AeadSssContainer,
+    util::{ParseHexError, parse_colon_separated_hex, write_colon_separated_hex},
+};
 
 #[derive(Debug, Clone, Copy, sqlx::Type)]
 #[sqlx(transparent)]
 pub struct CertSerial(i64);
 
+impl CertSerial {
+    pub fn random() -> Self {
+        Self(rand::random())
+    }
+}
+
 impl fmt::Display for CertSerial {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ColonSeparatedHex(&self.0.to_be_bytes()).fmt(f)
+        write_colon_separated_hex(&self.0.to_be_bytes(), f)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("failed to parse serial number: {0}")]
+pub struct ParseSerialError(#[from] ParseHexError);
+
+impl FromStr for CertSerial {
+    type Err = ParseSerialError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut buf = [0u8; 8];
+        parse_colon_separated_hex(s, &mut buf)?;
+        Ok(Self(i64::from_be_bytes(buf)))
     }
 }
 
@@ -57,11 +80,9 @@ pub fn create_crl_params(
 pub async fn insert_cert(
     conn: impl SqliteExecutor<'_>,
     issuer: &str,
-    serial_number: u64,
+    serial_number: CertSerial,
     der: &[u8],
 ) -> sqlx::Result<()> {
-    // i64 implements Encode, but u64 does not
-    let serial_number = serial_number.cast_signed();
     sqlx::query!(
         "INSERT INTO certificates (issuer, serial_number, der) VALUES ($1, $2, $3)",
         issuer,
@@ -148,11 +169,82 @@ pub async fn get_issuer_key(
     Ok((params, key_pair))
 }
 
+pub async fn revoke_cert(
+    conn: impl SqliteExecutor<'_>,
+    serial_number: CertSerial,
+    issuer: &str,
+    revocation_time: OffsetDateTime,
+    revocation_code: RevocationReason,
+    invalidity_date: Option<OffsetDateTime>,
+) -> Result<(), sqlx::Error> {
+    let revocation_code = revocation_code as i32;
+
+    sqlx::query!(
+        r#"
+        UPDATE certificates SET
+            revocation_time = $1,
+            revocation_code = $2,
+            invalidity_date = $3
+        WHERE issuer = $4 AND serial_number = $5
+        "#,
+        revocation_time,
+        revocation_code,
+        invalidity_date,
+        issuer,
+        serial_number,
+    )
+    .execute(conn)
+    .await?;
+
+    Ok(())
+}
+
+fn parse_revocation_code(code: Option<i64>) -> Option<RevocationReason> {
+    Some(match code? {
+        0 => RevocationReason::Unspecified,
+        1 => RevocationReason::KeyCompromise,
+        2 => RevocationReason::CaCompromise,
+        3 => RevocationReason::AffiliationChanged,
+        4 => RevocationReason::Superseded,
+        5 => RevocationReason::CessationOfOperation,
+        6 => RevocationReason::CertificateHold,
+        8 => RevocationReason::RemoveFromCrl,
+        9 => RevocationReason::PrivilegeWithdrawn,
+        10 => RevocationReason::AaCompromise,
+        _ => return None,
+    })
+}
+
 async fn list_revoked_certs(
     conn: impl SqliteExecutor<'_>,
     issuer: &str,
 ) -> Result<Vec<RevokedCertParams>, sqlx::Error> {
-    Ok(vec![])
+    let records = sqlx::query!(
+        r#"
+        SELECT
+            serial_number,
+            revocation_time as "revocation_time: OffsetDateTime",
+            revocation_code,
+            invalidity_date as "invalidity_date: OffsetDateTime"
+        FROM certificates
+        WHERE issuer = $1 AND revocation_time IS NOT NULL
+        "#,
+        issuer
+    )
+    .fetch_all(conn)
+    .await?;
+
+    let revoked_certs = records
+        .into_iter()
+        .map(|record| RevokedCertParams {
+            serial_number: SerialNumber::from_slice(&record.serial_number.to_be_bytes()),
+            revocation_time: record.revocation_time.unwrap(),
+            reason_code: parse_revocation_code(record.revocation_code),
+            invalidity_date: record.invalidity_date,
+        })
+        .collect();
+
+    Ok(revoked_certs)
 }
 
 #[derive(Debug, thiserror::Error)]

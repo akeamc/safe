@@ -8,20 +8,26 @@ use proto::{
     UpdateCrlResponse,
     safe_server::{Safe, SafeServer},
 };
-use rcgen::{CertificateParams, KeyPair, PublicKeyData, SerialNumber, SubjectPublicKeyInfo};
+use rcgen::{
+    CertificateParams, CertificateSigningRequestParams, IsCa, KeyPair, PublicKeyData,
+    RevocationReason,
+};
 use rustls_pki_types::CertificateDer;
 use sqlx::{SqlitePool, types::Json};
+use time::{Duration, OffsetDateTime};
 use tokio_util::sync::CancellationToken;
 use tonic::{Code, Request, Response, Status};
 use tracing::warn;
 use x509_parser::pem::parse_x509_pem;
 
 use crate::{
+    grpc::proto::{RevokeCertificateRequest, RevokeCertificateResponse},
     issuer::{
-        CertSerial, GetIssuerKeyError, SignCrlError, get_issuer_aead_container, get_issuer_key,
-        insert_cert, sign_crl,
+        self, CertSerial, GetIssuerKeyError, ParseSerialError, SignCrlError,
+        get_issuer_aead_container, get_issuer_key, insert_cert, sign_crl,
     },
     key::{self, SplitError},
+    util::protobuf_to_time,
 };
 
 pub mod proto {
@@ -78,23 +84,26 @@ fn decode_certified_key(
 
 #[derive(Debug, thiserror::Error)]
 enum SignCertError {
-    #[error("invalid spki")]
-    InvalidSpki,
+    #[error("invalid CSR data")]
+    InvalidCsr,
     #[error("database error")]
     Db(#[from] sqlx::Error),
     #[error("crypto error")]
     Crypto,
     #[error(transparent)]
     GetIssuerKeyError(#[from] GetIssuerKeyError),
+    #[error("invalid certificate timestamps")]
+    InvalidTimestamps,
 }
 
 impl From<SignCertError> for Status {
     fn from(err: SignCertError) -> Self {
         let code = match err {
-            SignCertError::InvalidSpki => Code::InvalidArgument,
+            SignCertError::InvalidCsr => Code::InvalidArgument,
             SignCertError::Db(_) => Code::Internal,
             SignCertError::Crypto => Code::Internal,
             SignCertError::GetIssuerKeyError(inner) => return inner.into(),
+            SignCertError::InvalidTimestamps => Code::InvalidArgument,
         };
 
         Self::new(code, err.to_string())
@@ -103,24 +112,43 @@ impl From<SignCertError> for Status {
 
 async fn sign_cert(
     db: &SqlitePool,
-    csr: SignCertificateRequest,
+    req: SignCertificateRequest,
 ) -> Result<SignCertificateResponse, SignCertError> {
+    const DEFAULT_VALIDITY: Duration = Duration::days(90);
+
     let SignCertificateRequest {
         issuer,
-        spki,
+        csr,
         secret,
-    } = csr;
+        not_before,
+        not_after,
+    } = req;
 
-    let spki = SubjectPublicKeyInfo::from_der(&spki).map_err(|_| SignCertError::InvalidSpki)?;
-    let serial_number: u64 = rand::random();
-    let mut params =
-        CertificateParams::new(Vec::default()).expect("empty SAN cannot produce error");
-    params.serial_number = Some(SerialNumber::from_slice(&serial_number.to_be_bytes()));
+    let mut csr = CertificateSigningRequestParams::from_der(&csr.into())
+        .map_err(|_| SignCertError::InvalidCsr)?;
+    let serial_number = CertSerial::random();
+
+    csr.params.serial_number = Some(serial_number.into());
+    csr.params.is_ca = IsCa::ExplicitNoCa;
+
+    let not_before = not_before
+        .map(protobuf_to_time)
+        .unwrap_or_else(OffsetDateTime::now_utc);
+    let not_after = not_after
+        .map(protobuf_to_time)
+        .unwrap_or_else(|| not_before + DEFAULT_VALIDITY);
+
+    if not_before >= not_after {
+        return Err(SignCertError::InvalidTimestamps);
+    }
+
+    csr.params.not_before = not_before;
+    csr.params.not_after = not_after;
 
     let mut conn = db.begin().await?;
     let (ca, ca_key) = get_issuer_key(&mut *conn, &issuer, secret).await?;
-    let der = params
-        .signed_by(&spki, &ca, &ca_key)
+    let der = csr
+        .signed_by(&ca, &ca_key)
         .map_err(|_| SignCertError::Crypto)?
         .der()
         .to_vec();
@@ -128,6 +156,91 @@ async fn sign_cert(
     conn.commit().await?;
 
     Ok(SignCertificateResponse { der })
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum RevokeCertError {
+    #[error(transparent)]
+    ParseSerial(#[from] ParseSerialError),
+    #[error("database error")]
+    Db(#[from] sqlx::Error),
+    #[error("failed to sign CRL")]
+    SignCrl,
+    #[error(transparent)]
+    GetIssuerKeyError(#[from] GetIssuerKeyError),
+}
+
+impl From<SignCrlError> for RevokeCertError {
+    fn from(err: SignCrlError) -> Self {
+        match err {
+            SignCrlError::Db(db) => Self::Db(db),
+            SignCrlError::SignCrl => Self::SignCrl,
+        }
+    }
+}
+
+impl From<RevokeCertError> for Status {
+    fn from(err: RevokeCertError) -> Self {
+        let code = match err {
+            RevokeCertError::ParseSerial(_) => Code::InvalidArgument,
+            RevokeCertError::Db(_) => Code::Internal,
+            RevokeCertError::SignCrl => Code::Internal,
+            RevokeCertError::GetIssuerKeyError(inner) => return inner.into(),
+        };
+
+        Self::new(code, err.to_string())
+    }
+}
+
+async fn revoke_cert(
+    db: &SqlitePool,
+    req: RevokeCertificateRequest,
+) -> Result<RevokeCertificateResponse, RevokeCertError> {
+    let RevokeCertificateRequest {
+        issuer,
+        secret,
+        serial,
+        reason,
+    } = req;
+
+    use proto::RevocationReason as ProtoReason;
+
+    let serial = serial.parse::<CertSerial>()?;
+
+    let mut conn = db.begin().await?;
+
+    let revocation_code = reason
+        .map(|reason| match ProtoReason::try_from(reason) {
+            Ok(ProtoReason::Unspecified) => RevocationReason::Unspecified,
+            Ok(ProtoReason::KeyCompromise) => RevocationReason::KeyCompromise,
+            Ok(ProtoReason::CaCompromise) => RevocationReason::CaCompromise,
+            Ok(ProtoReason::AffiliationChanged) => RevocationReason::AffiliationChanged,
+            Ok(ProtoReason::Superseded) => RevocationReason::Superseded,
+            Ok(ProtoReason::CessationOfOperation) => RevocationReason::CessationOfOperation,
+            Ok(ProtoReason::CertificateHold) => RevocationReason::CertificateHold,
+            Ok(ProtoReason::RemoveFromCrl) => RevocationReason::RemoveFromCrl,
+            Ok(ProtoReason::PrivilegeWithdrawn) => RevocationReason::PrivilegeWithdrawn,
+            Ok(ProtoReason::AaCompromise) => RevocationReason::AaCompromise,
+            Err(_) => RevocationReason::Unspecified,
+        })
+        .unwrap_or(RevocationReason::Unspecified);
+
+    let revocation_time = OffsetDateTime::now_utc();
+    issuer::revoke_cert(
+        &mut *conn,
+        serial,
+        &issuer,
+        revocation_time,
+        revocation_code,
+        None,
+    )
+    .await?;
+
+    let (params, key_pair) = get_issuer_key(&mut *conn, &issuer, secret).await?;
+
+    sign_crl(conn, &issuer, &params, &key_pair).await?;
+
+    Ok(RevokeCertificateResponse {})
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -340,6 +453,15 @@ impl Safe for SafeService {
         let cert = sign_cert(&self.state.db, request.into_inner()).await?;
 
         Ok(Response::new(cert))
+    }
+
+    async fn revoke_certificate(
+        &self,
+        request: Request<RevokeCertificateRequest>,
+    ) -> Result<Response<RevokeCertificateResponse>, Status> {
+        let res = revoke_cert(&self.state.db, request.into_inner()).await?;
+
+        Ok(Response::new(res))
     }
 
     async fn roll_client_secrets(
