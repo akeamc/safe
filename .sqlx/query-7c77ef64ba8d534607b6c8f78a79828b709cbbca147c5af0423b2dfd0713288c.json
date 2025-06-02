@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            serial_number,\n            revocation_time as \"revocation_time: OffsetDateTime\",\n            revocation_code,\n            invalidity_date as \"invalidity_date: OffsetDateTime\"\n        FROM certificates\n        WHERE issuer = $1 AND revocation_time IS NOT NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "serial_number",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "revocation_time: OffsetDateTime",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "revocation_code",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "invalidity_date: OffsetDateTime",
+        "ordinal": 3,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "7c77ef64ba8d534607b6c8f78a79828b709cbbca147c5af0423b2dfd0713288c"
+}

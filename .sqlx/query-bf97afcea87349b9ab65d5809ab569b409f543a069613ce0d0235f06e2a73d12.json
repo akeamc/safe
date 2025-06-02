@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE certificates SET\n            revocation_time = $1,\n            revocation_code = $2,\n            invalidity_date = $3\n        WHERE issuer = $4 AND serial_number = $5\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "bf97afcea87349b9ab65d5809ab569b409f543a069613ce0d0235f06e2a73d12"
+}

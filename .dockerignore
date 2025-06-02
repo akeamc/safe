@@ -1,0 +1,4 @@
+/target
+/safe-py
+*.db
+.env
