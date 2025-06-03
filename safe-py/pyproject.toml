@@ -21,6 +21,6 @@ ignore = [
 
 [dependency-groups]
 dev = [
-    "grpcio-tools>=1.72.1",
+    "grpcio-tools<=1.71.0", # keeps protobuf version at <6
     "mypy-protobuf>=3.6.0",
 ]
