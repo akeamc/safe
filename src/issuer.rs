@@ -1,13 +1,10 @@
 use std::{fmt, str::FromStr};
 
-use rcgen::{
-    CertificateParams, CertificateRevocationListParams, KeyIdMethod, KeyPair, RevocationReason,
-    RevokedCertParams, SerialNumber, SigningKey,
-};
+use rcgen::{CertificateParams, KeyPair, SerialNumber};
 use rustls_pki_types::PrivatePkcs8KeyDer;
 use secrecy::ExposeSecret;
-use sqlx::{SqliteExecutor, SqliteTransaction, types::Json};
-use time::OffsetDateTime;
+use serde_with::DeserializeFromStr;
+use sqlx::{SqliteExecutor, types::Json};
 use tonic::Status;
 use tracing::error;
 
@@ -52,34 +49,46 @@ impl From<CertSerial> for SerialNumber {
     }
 }
 
-/// Create parameters for a CRL, using the provided issued certificates and update times.
-/// The `this_update` parameter will be used to derive the crl number, and must therefore
-/// be monotonic.
-pub fn create_crl_params(
-    revoked_certs: Vec<RevokedCertParams>,
-    this_update: OffsetDateTime,
-    next_update: OffsetDateTime,
-    crl_number: Option<SerialNumber>,
-) -> CertificateRevocationListParams {
-    use rcgen::CertificateRevocationListParams;
+#[derive(Debug, Clone, DeserializeFromStr, sqlx::Type)]
+#[sqlx(transparent)]
+pub struct IssuerIdentifier(String);
 
-    let crl_number = crl_number.unwrap_or_else(|| {
-        SerialNumber::from_slice(&(this_update.unix_timestamp_nanos() / 1_000_000).to_be_bytes())
-    });
+#[derive(Debug, thiserror::Error)]
+pub enum IssuerIdentifierError {
+    #[error("issuer identifier cannot be empty")]
+    Empty,
+    #[error("issuer identifier must be alphanumeric")]
+    Alphanumeric,
+}
 
-    CertificateRevocationListParams {
-        this_update,
-        next_update,
-        crl_number,
-        issuing_distribution_point: None,
-        revoked_certs,
-        key_identifier_method: KeyIdMethod::Sha256,
+impl FromStr for IssuerIdentifier {
+    type Err = IssuerIdentifierError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            return Err(IssuerIdentifierError::Empty);
+        }
+
+        if !s
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(IssuerIdentifierError::Alphanumeric);
+        }
+
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl fmt::Display for IssuerIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
 pub async fn insert_cert(
     conn: impl SqliteExecutor<'_>,
-    issuer: &str,
+    issuer: &IssuerIdentifier,
     serial_number: CertSerial,
     der: &[u8],
 ) -> sqlx::Result<()> {
@@ -123,7 +132,7 @@ impl From<GetIssuerKeyError> for Status {
 
 pub async fn get_issuer_aead_container(
     conn: impl SqliteExecutor<'_>,
-    issuer: &str,
+    issuer: &IssuerIdentifier,
 ) -> Result<Option<AeadSssContainer>, sqlx::Error> {
     let record = sqlx::query!(
         r#"
@@ -141,7 +150,7 @@ pub async fn get_issuer_aead_container(
 
 pub async fn get_issuer_key(
     conn: impl SqliteExecutor<'_>,
-    issuer: &str,
+    issuer: &IssuerIdentifier,
     final_secret_share: String,
 ) -> Result<(CertificateParams, KeyPair), GetIssuerKeyError> {
     let record = sqlx::query!(
@@ -167,120 +176,4 @@ pub async fn get_issuer_key(
     })?;
 
     Ok((params, key_pair))
-}
-
-pub async fn revoke_cert(
-    conn: impl SqliteExecutor<'_>,
-    serial_number: CertSerial,
-    issuer: &str,
-    revocation_time: OffsetDateTime,
-    revocation_code: RevocationReason,
-    invalidity_date: Option<OffsetDateTime>,
-) -> Result<(), sqlx::Error> {
-    let revocation_code = revocation_code as i32;
-
-    sqlx::query!(
-        r#"
-        UPDATE certificates SET
-            revocation_time = $1,
-            revocation_code = $2,
-            invalidity_date = $3
-        WHERE issuer = $4 AND serial_number = $5
-        "#,
-        revocation_time,
-        revocation_code,
-        invalidity_date,
-        issuer,
-        serial_number,
-    )
-    .execute(conn)
-    .await?;
-
-    Ok(())
-}
-
-fn parse_revocation_code(code: Option<i64>) -> Option<RevocationReason> {
-    Some(match code? {
-        0 => RevocationReason::Unspecified,
-        1 => RevocationReason::KeyCompromise,
-        2 => RevocationReason::CaCompromise,
-        3 => RevocationReason::AffiliationChanged,
-        4 => RevocationReason::Superseded,
-        5 => RevocationReason::CessationOfOperation,
-        6 => RevocationReason::CertificateHold,
-        8 => RevocationReason::RemoveFromCrl,
-        9 => RevocationReason::PrivilegeWithdrawn,
-        10 => RevocationReason::AaCompromise,
-        _ => return None,
-    })
-}
-
-async fn list_revoked_certs(
-    conn: impl SqliteExecutor<'_>,
-    issuer: &str,
-) -> Result<Vec<RevokedCertParams>, sqlx::Error> {
-    let records = sqlx::query!(
-        r#"
-        SELECT
-            serial_number,
-            revocation_time as "revocation_time: OffsetDateTime",
-            revocation_code,
-            invalidity_date as "invalidity_date: OffsetDateTime"
-        FROM certificates
-        WHERE issuer = $1 AND revocation_time IS NOT NULL
-        "#,
-        issuer
-    )
-    .fetch_all(conn)
-    .await?;
-
-    let revoked_certs = records
-        .into_iter()
-        .map(|record| RevokedCertParams {
-            serial_number: SerialNumber::from_slice(&record.serial_number.to_be_bytes()),
-            revocation_time: record.revocation_time.unwrap(),
-            reason_code: parse_revocation_code(record.revocation_code),
-            invalidity_date: record.invalidity_date,
-        })
-        .collect();
-
-    Ok(revoked_certs)
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum SignCrlError {
-    #[error("db error")]
-    Db(#[from] sqlx::Error),
-    #[error("failed to sign CRL")]
-    SignCrl,
-}
-
-pub async fn sign_crl(
-    mut transaction: SqliteTransaction<'_>,
-    issuer: &str,
-    issuer_params: &CertificateParams,
-    issuer_signing_key: &impl SigningKey,
-) -> Result<(), SignCrlError> {
-    let this_update = OffsetDateTime::now_utc();
-    let next_update = this_update + time::Duration::days(365);
-
-    let revoked_certs = list_revoked_certs(&mut *transaction, issuer).await?;
-    let params = create_crl_params(revoked_certs, this_update, next_update, None);
-
-    let crl = params
-        .signed_by(issuer_params, issuer_signing_key)
-        .map_err(|_| SignCrlError::SignCrl)?;
-    let crl_der = crl.der().as_ref();
-
-    sqlx::query!(
-        "UPDATE issuers SET crl = $1 WHERE identifier = $2",
-        crl_der,
-        issuer
-    )
-    .execute(&mut *transaction)
-    .await?;
-
-    transaction.commit().await?;
-
-    Ok(())
 }

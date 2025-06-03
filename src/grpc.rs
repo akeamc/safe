@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, str::FromStr};
 
 use anyhow::Context;
 use proto::{
@@ -8,10 +8,7 @@ use proto::{
     UpdateCrlResponse,
     safe_server::{Safe, SafeServer},
 };
-use rcgen::{
-    CertificateParams, CertificateSigningRequestParams, IsCa, KeyPair, PublicKeyData,
-    RevocationReason,
-};
+use rcgen::{CertificateParams, CertificateSigningRequestParams, IsCa, KeyPair, PublicKeyData};
 use rustls_pki_types::CertificateDer;
 use sqlx::{SqlitePool, types::Json};
 use time::{Duration, OffsetDateTime};
@@ -21,21 +18,19 @@ use tracing::warn;
 use x509_parser::pem::parse_x509_pem;
 
 use crate::{
+    State,
     grpc::proto::{RevokeCertificateRequest, RevokeCertificateResponse},
     issuer::{
-        self, CertSerial, GetIssuerKeyError, ParseSerialError, SignCrlError,
-        get_issuer_aead_container, get_issuer_key, insert_cert, sign_crl,
+        CertSerial, GetIssuerKeyError, IssuerIdentifier, IssuerIdentifierError, ParseSerialError,
+        get_issuer_aead_container, get_issuer_key, insert_cert,
     },
     key::{self, SplitError},
+    revocation::set_cert_revocation,
+    revocation::{MakeCrlError, make_crl},
     util::protobuf_to_time,
 };
 
-pub mod proto {
-    tonic::include_proto!("safe");
-
-    pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
-        tonic::include_file_descriptor_set!("safe_descriptor");
-}
+pub mod proto;
 
 pub struct SafeService {
     pub state: crate::State,
@@ -94,6 +89,8 @@ enum SignCertError {
     GetIssuerKeyError(#[from] GetIssuerKeyError),
     #[error("invalid certificate timestamps")]
     InvalidTimestamps,
+    #[error(transparent)]
+    IssuerIdentifier(#[from] IssuerIdentifierError),
 }
 
 impl From<SignCertError> for Status {
@@ -104,6 +101,7 @@ impl From<SignCertError> for Status {
             SignCertError::Crypto => Code::Internal,
             SignCertError::GetIssuerKeyError(inner) => return inner.into(),
             SignCertError::InvalidTimestamps => Code::InvalidArgument,
+            SignCertError::IssuerIdentifier(_) => Code::InvalidArgument,
         };
 
         Self::new(code, err.to_string())
@@ -111,7 +109,7 @@ impl From<SignCertError> for Status {
 }
 
 async fn sign_cert(
-    db: &SqlitePool,
+    state: &State,
     req: SignCertificateRequest,
 ) -> Result<SignCertificateResponse, SignCertError> {
     const DEFAULT_VALIDITY: Duration = Duration::days(90);
@@ -126,6 +124,11 @@ async fn sign_cert(
 
     let mut csr = CertificateSigningRequestParams::from_der(&csr.into())
         .map_err(|_| SignCertError::InvalidCsr)?;
+    let issuer = IssuerIdentifier::from_str(&issuer)?;
+
+    let mut conn = state.db.begin().await?;
+    let (ca, ca_key) = get_issuer_key(&mut *conn, &issuer, secret).await?;
+
     let serial_number = CertSerial::random();
 
     csr.params.serial_number = Some(serial_number.into());
@@ -138,15 +141,14 @@ async fn sign_cert(
         .map(protobuf_to_time)
         .unwrap_or_else(|| not_before + DEFAULT_VALIDITY);
 
-    if not_before >= not_after {
+    if not_before > not_after {
         return Err(SignCertError::InvalidTimestamps);
     }
 
     csr.params.not_before = not_before;
     csr.params.not_after = not_after;
+    csr.params.crl_distribution_points = vec![state.crl_distribution_point(&issuer)];
 
-    let mut conn = db.begin().await?;
-    let (ca, ca_key) = get_issuer_key(&mut *conn, &issuer, secret).await?;
     let der = csr
         .signed_by(&ca, &ca_key)
         .map_err(|_| SignCertError::Crypto)?
@@ -168,13 +170,15 @@ pub enum RevokeCertError {
     SignCrl,
     #[error(transparent)]
     GetIssuerKeyError(#[from] GetIssuerKeyError),
+    #[error(transparent)]
+    IssuerIdentifier(#[from] IssuerIdentifierError),
 }
 
-impl From<SignCrlError> for RevokeCertError {
-    fn from(err: SignCrlError) -> Self {
+impl From<MakeCrlError> for RevokeCertError {
+    fn from(err: MakeCrlError) -> Self {
         match err {
-            SignCrlError::Db(db) => Self::Db(db),
-            SignCrlError::SignCrl => Self::SignCrl,
+            MakeCrlError::Db(db) => Self::Db(db),
+            MakeCrlError::SignCrl => Self::SignCrl,
         }
     }
 }
@@ -186,6 +190,7 @@ impl From<RevokeCertError> for Status {
             RevokeCertError::Db(_) => Code::Internal,
             RevokeCertError::SignCrl => Code::Internal,
             RevokeCertError::GetIssuerKeyError(inner) => return inner.into(),
+            RevokeCertError::IssuerIdentifier(_) => Code::InvalidArgument,
         };
 
         Self::new(code, err.to_string())
@@ -193,7 +198,7 @@ impl From<RevokeCertError> for Status {
 }
 
 async fn revoke_cert(
-    db: &SqlitePool,
+    state: &State,
     req: RevokeCertificateRequest,
 ) -> Result<RevokeCertificateResponse, RevokeCertError> {
     let RevokeCertificateRequest {
@@ -201,44 +206,40 @@ async fn revoke_cert(
         secret,
         serial,
         reason,
+        invalidity_date,
     } = req;
 
-    use proto::RevocationReason as ProtoReason;
-
     let serial = serial.parse::<CertSerial>()?;
+    let issuer = IssuerIdentifier::from_str(&issuer)?;
 
-    let mut conn = db.begin().await?;
+    let mut conn = state.db.begin().await?;
 
-    let revocation_code = reason
-        .map(|reason| match ProtoReason::try_from(reason) {
-            Ok(ProtoReason::Unspecified) => RevocationReason::Unspecified,
-            Ok(ProtoReason::KeyCompromise) => RevocationReason::KeyCompromise,
-            Ok(ProtoReason::CaCompromise) => RevocationReason::CaCompromise,
-            Ok(ProtoReason::AffiliationChanged) => RevocationReason::AffiliationChanged,
-            Ok(ProtoReason::Superseded) => RevocationReason::Superseded,
-            Ok(ProtoReason::CessationOfOperation) => RevocationReason::CessationOfOperation,
-            Ok(ProtoReason::CertificateHold) => RevocationReason::CertificateHold,
-            Ok(ProtoReason::RemoveFromCrl) => RevocationReason::RemoveFromCrl,
-            Ok(ProtoReason::PrivilegeWithdrawn) => RevocationReason::PrivilegeWithdrawn,
-            Ok(ProtoReason::AaCompromise) => RevocationReason::AaCompromise,
-            Err(_) => RevocationReason::Unspecified,
-        })
-        .unwrap_or(RevocationReason::Unspecified);
+    let revocation_code: rcgen::RevocationReason = reason
+        .and_then(|reason| proto::RevocationReason::try_from(reason).ok())
+        .unwrap_or_default()
+        .into();
 
     let revocation_time = OffsetDateTime::now_utc();
-    issuer::revoke_cert(
+    set_cert_revocation(
         &mut *conn,
         serial,
         &issuer,
         revocation_time,
         revocation_code,
-        None,
+        invalidity_date.map(protobuf_to_time),
     )
     .await?;
 
     let (params, key_pair) = get_issuer_key(&mut *conn, &issuer, secret).await?;
 
-    sign_crl(conn, &issuer, &params, &key_pair).await?;
+    make_crl(
+        conn,
+        &issuer,
+        &params,
+        &key_pair,
+        Some(state.issuing_distribution_point(&issuer)),
+    )
+    .await?;
 
     Ok(RevokeCertificateResponse {})
 }
@@ -251,8 +252,8 @@ enum InsertIssuerError {
     InvalidData(#[from] VerifyCertifiedKeyError),
     #[error("issuer already exists")]
     IssuerExists,
-    #[error("invalid issuer identifier")]
-    InvalidIdentifier,
+    #[error(transparent)]
+    IssuerIdentifier(#[from] IssuerIdentifierError),
     #[error(transparent)]
     SplitKeyError(#[from] key::SplitError),
 }
@@ -263,7 +264,7 @@ impl From<InsertIssuerError> for Status {
             InsertIssuerError::Db(_) => Code::Internal,
             InsertIssuerError::InvalidData(_) => Code::InvalidArgument,
             InsertIssuerError::IssuerExists => Code::AlreadyExists,
-            InsertIssuerError::InvalidIdentifier => Code::InvalidArgument,
+            InsertIssuerError::IssuerIdentifier(_) => Code::InvalidArgument,
             InsertIssuerError::SplitKeyError(e) => match e {
                 SplitError::InvalidKeyCount => Code::InvalidArgument,
             },
@@ -274,7 +275,7 @@ impl From<InsertIssuerError> for Status {
 }
 
 async fn create_issuer(
-    db: &SqlitePool,
+    state: &State,
     req: CreateIssuerRequest,
 ) -> Result<CreateIssuerResponse, InsertIssuerError> {
     let CreateIssuerRequest {
@@ -284,24 +285,22 @@ async fn create_issuer(
         n_client_secrets,
     } = req;
 
-    if identifier.is_empty() {
-        return Err(InsertIssuerError::InvalidIdentifier);
-    }
+    let identifier = IssuerIdentifier::from_str(&identifier)?;
 
     let (params, key_pair) = decode_certified_key(&cert, &private_key)?;
-    let (ours, client_secrets) = key::split(
+    let (container, client_secrets) = key::split(
         &key_pair.serialize_der(),
         n_client_secrets.unwrap_or(1).try_into().unwrap(),
     )?;
-    let sss_container = serde_json::to_string(&ours).unwrap();
+    let container = Json(container);
 
     let res = match sqlx::query!(
         "INSERT INTO issuers (identifier, cert, private_key) VALUES ($1, $2, $3) RETURNING identifier, cert",
         identifier,
         cert,
-        sss_container
+        container,
     )
-    .fetch_one(db)
+    .fetch_one(&state.db)
     .await {
         Ok(new_row) => CreateIssuerResponse {
             identifier: new_row.identifier.unwrap_or_default(),
@@ -314,7 +313,15 @@ async fn create_issuer(
         Err(e) => return Err(InsertIssuerError::Db(e)),
     };
 
-    if let Err(err) = sign_crl(db.begin().await?, &res.identifier, &params, &key_pair).await {
+    if let Err(err) = make_crl(
+        state.db.begin().await?,
+        &identifier,
+        &params,
+        &key_pair,
+        Some(state.issuing_distribution_point(&identifier)),
+    )
+    .await
+    {
         warn!("failed to sign CRL for new issuer: {err}");
     }
 
@@ -329,6 +336,8 @@ enum RollClientSecretsError {
     Roll(#[from] key::RollError),
     #[error("issuer not found")]
     IssuerNotFound,
+    #[error(transparent)]
+    IssuerIdentifier(#[from] IssuerIdentifierError),
 }
 
 impl From<RollClientSecretsError> for Status {
@@ -337,6 +346,7 @@ impl From<RollClientSecretsError> for Status {
             RollClientSecretsError::Db(_) => Code::Internal,
             RollClientSecretsError::Roll(_) => Code::PermissionDenied,
             RollClientSecretsError::IssuerNotFound => Code::NotFound,
+            RollClientSecretsError::IssuerIdentifier(_) => Code::InvalidArgument,
         };
 
         Self::new(code, err.to_string())
@@ -353,6 +363,7 @@ async fn roll_client_secrets(
         n_client_secrets,
     } = req;
 
+    let issuer = IssuerIdentifier::from_str(&issuer)?;
     let mut conn = db.begin().await?;
     let mut container = get_issuer_aead_container(&mut *conn, &issuer)
         .await?
@@ -381,13 +392,15 @@ pub enum UpdateCrlError {
     SignCrl,
     #[error(transparent)]
     GetIssuerKeyError(#[from] GetIssuerKeyError),
+    #[error(transparent)]
+    IssuerIdentifier(#[from] IssuerIdentifierError),
 }
 
-impl From<SignCrlError> for UpdateCrlError {
-    fn from(err: SignCrlError) -> Self {
+impl From<MakeCrlError> for UpdateCrlError {
+    fn from(err: MakeCrlError) -> Self {
         match err {
-            SignCrlError::Db(db) => Self::Db(db),
-            SignCrlError::SignCrl => Self::SignCrl,
+            MakeCrlError::Db(db) => Self::Db(db),
+            MakeCrlError::SignCrl => Self::SignCrl,
         }
     }
 }
@@ -398,6 +411,7 @@ impl From<UpdateCrlError> for Status {
             UpdateCrlError::Db(_) => Code::Internal,
             UpdateCrlError::SignCrl => Code::Internal,
             UpdateCrlError::GetIssuerKeyError(inner) => return inner.into(),
+            UpdateCrlError::IssuerIdentifier(_) => Code::InvalidArgument,
         };
 
         Self::new(code, err.to_string())
@@ -405,16 +419,24 @@ impl From<UpdateCrlError> for Status {
 }
 
 async fn update_crl(
-    db: &SqlitePool,
+    state: &State,
     req: UpdateCrlRequest,
 ) -> Result<UpdateCrlResponse, UpdateCrlError> {
     let UpdateCrlRequest { issuer, secret } = req;
 
-    let mut transaction = db.begin().await?;
+    let issuer = IssuerIdentifier::from_str(&issuer)?;
+    let mut transaction = state.db.begin().await?;
 
     let (params, key_pair) = get_issuer_key(&mut *transaction, &issuer, secret).await?;
 
-    sign_crl(transaction, &issuer, &params, &key_pair).await?;
+    make_crl(
+        transaction,
+        &issuer,
+        &params,
+        &key_pair,
+        Some(state.issuing_distribution_point(&issuer)),
+    )
+    .await?;
 
     Ok(UpdateCrlResponse {})
 }
@@ -450,7 +472,7 @@ impl Safe for SafeService {
         &self,
         request: Request<SignCertificateRequest>,
     ) -> Result<Response<SignCertificateResponse>, Status> {
-        let cert = sign_cert(&self.state.db, request.into_inner()).await?;
+        let cert = sign_cert(&self.state, request.into_inner()).await?;
 
         Ok(Response::new(cert))
     }
@@ -459,7 +481,7 @@ impl Safe for SafeService {
         &self,
         request: Request<RevokeCertificateRequest>,
     ) -> Result<Response<RevokeCertificateResponse>, Status> {
-        let res = revoke_cert(&self.state.db, request.into_inner()).await?;
+        let res = revoke_cert(&self.state, request.into_inner()).await?;
 
         Ok(Response::new(res))
     }
@@ -477,7 +499,7 @@ impl Safe for SafeService {
         &self,
         request: Request<UpdateCrlRequest>,
     ) -> Result<Response<UpdateCrlResponse>, Status> {
-        let res = update_crl(&self.state.db, request.into_inner()).await?;
+        let res = update_crl(&self.state, request.into_inner()).await?;
 
         Ok(Response::new(res))
     }
@@ -486,7 +508,7 @@ impl Safe for SafeService {
         &self,
         request: Request<CreateIssuerRequest>,
     ) -> Result<Response<CreateIssuerResponse>, Status> {
-        let info = create_issuer(&self.state.db, request.into_inner()).await?;
+        let info = create_issuer(&self.state, request.into_inner()).await?;
 
         Ok(Response::new(info))
     }
@@ -510,7 +532,7 @@ impl Safe for SafeService {
         )
         .fetch_all(&mut *conn)
         .await
-        .map_err(|e| Status::new(Code::Internal, format!("failed to fetch certificates: {e}")))?
+        .map_err(|_| Status::new(Code::Internal, "failed to fetch certificates"))?
         .into_iter()
         .map(|row| row.serial_number.to_string())
         .collect();

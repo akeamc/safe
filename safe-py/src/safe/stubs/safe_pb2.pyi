@@ -5,14 +5,13 @@ isort:skip_file
 
 import builtins
 import collections.abc
-import sys
-import typing
-
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
+import sys
+import typing
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -25,12 +24,7 @@ class _RevocationReason:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _RevocationReasonEnumTypeWrapper(
-    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
-        _RevocationReason.ValueType
-    ],
-    builtins.type,
-):
+class _RevocationReasonEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_RevocationReason.ValueType], builtins.type):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     UNSPECIFIED: _RevocationReason.ValueType  # 0
     KEY_COMPROMISE: _RevocationReason.ValueType  # 1
@@ -43,9 +37,7 @@ class _RevocationReasonEnumTypeWrapper(
     PRIVILEGE_WITHDRAWN: _RevocationReason.ValueType  # 9
     AA_COMPROMISE: _RevocationReason.ValueType  # 10
 
-class RevocationReason(
-    _RevocationReason, metaclass=_RevocationReasonEnumTypeWrapper
-): ...
+class RevocationReason(_RevocationReason, metaclass=_RevocationReasonEnumTypeWrapper): ...
 
 UNSPECIFIED: RevocationReason.ValueType  # 0
 KEY_COMPROMISE: RevocationReason.ValueType  # 1
@@ -75,11 +67,7 @@ class IssuerList(google.protobuf.message.Message):
 
     ISSUERS_FIELD_NUMBER: builtins.int
     @property
-    def issuers(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___IssuerInfo
-    ]: ...
+    def issuers(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___IssuerInfo]: ...
     def __init__(
         self,
         *,
@@ -109,33 +97,9 @@ class CreateIssuerRequest(google.protobuf.message.Message):
         private_key: builtins.str = ...,
         n_client_secrets: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing.Literal[
-            "_n_client_secrets",
-            b"_n_client_secrets",
-            "n_client_secrets",
-            b"n_client_secrets",
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing.Literal[
-            "_n_client_secrets",
-            b"_n_client_secrets",
-            "cert",
-            b"cert",
-            "identifier",
-            b"identifier",
-            "n_client_secrets",
-            b"n_client_secrets",
-            "private_key",
-            b"private_key",
-        ],
-    ) -> None: ...
-    def WhichOneof(
-        self, oneof_group: typing.Literal["_n_client_secrets", b"_n_client_secrets"]
-    ) -> typing.Literal["n_client_secrets"] | None: ...
+    def HasField(self, field_name: typing.Literal["_n_client_secrets", b"_n_client_secrets", "n_client_secrets", b"n_client_secrets"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_n_client_secrets", b"_n_client_secrets", "cert", b"cert", "identifier", b"identifier", "n_client_secrets", b"n_client_secrets", "private_key", b"private_key"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_n_client_secrets", b"_n_client_secrets"]) -> typing.Literal["n_client_secrets"] | None: ...
 
 global___CreateIssuerRequest = CreateIssuerRequest
 
@@ -149,11 +113,7 @@ class CreateIssuerResponse(google.protobuf.message.Message):
     identifier: builtins.str
     cert: builtins.str
     @property
-    def client_secrets(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
-        builtins.str
-    ]: ...
+    def client_secrets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
@@ -161,17 +121,7 @@ class CreateIssuerResponse(google.protobuf.message.Message):
         cert: builtins.str = ...,
         client_secrets: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(
-        self,
-        field_name: typing.Literal[
-            "cert",
-            b"cert",
-            "client_secrets",
-            b"client_secrets",
-            "identifier",
-            b"identifier",
-        ],
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["cert", b"cert", "client_secrets", b"client_secrets", "identifier", b"identifier"]) -> None: ...
 
 global___CreateIssuerResponse = CreateIssuerResponse
 
@@ -190,9 +140,7 @@ class IssuerInfo(google.protobuf.message.Message):
         identifier: builtins.str = ...,
         cert: builtins.str = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing.Literal["cert", b"cert", "identifier", b"identifier"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["cert", b"cert", "identifier", b"identifier"]) -> None: ...
 
 global___IssuerInfo = IssuerInfo
 
@@ -213,31 +161,9 @@ class RollClientSecretsRequest(google.protobuf.message.Message):
         secret: builtins.str = ...,
         n_client_secrets: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing.Literal[
-            "_n_client_secrets",
-            b"_n_client_secrets",
-            "n_client_secrets",
-            b"n_client_secrets",
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing.Literal[
-            "_n_client_secrets",
-            b"_n_client_secrets",
-            "issuer",
-            b"issuer",
-            "n_client_secrets",
-            b"n_client_secrets",
-            "secret",
-            b"secret",
-        ],
-    ) -> None: ...
-    def WhichOneof(
-        self, oneof_group: typing.Literal["_n_client_secrets", b"_n_client_secrets"]
-    ) -> typing.Literal["n_client_secrets"] | None: ...
+    def HasField(self, field_name: typing.Literal["_n_client_secrets", b"_n_client_secrets", "n_client_secrets", b"n_client_secrets"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_n_client_secrets", b"_n_client_secrets", "issuer", b"issuer", "n_client_secrets", b"n_client_secrets", "secret", b"secret"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_n_client_secrets", b"_n_client_secrets"]) -> typing.Literal["n_client_secrets"] | None: ...
 
 global___RollClientSecretsRequest = RollClientSecretsRequest
 
@@ -247,19 +173,13 @@ class RollClientSecretsResponse(google.protobuf.message.Message):
 
     CLIENT_SECRETS_FIELD_NUMBER: builtins.int
     @property
-    def client_secrets(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
-        builtins.str
-    ]: ...
+    def client_secrets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         client_secrets: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing.Literal["client_secrets", b"client_secrets"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["client_secrets", b"client_secrets"]) -> None: ...
 
 global___RollClientSecretsResponse = RollClientSecretsResponse
 
@@ -277,9 +197,7 @@ class UpdateCrlRequest(google.protobuf.message.Message):
         issuer: builtins.str = ...,
         secret: builtins.str = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing.Literal["issuer", b"issuer", "secret", b"secret"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["issuer", b"issuer", "secret", b"secret"]) -> None: ...
 
 global___UpdateCrlRequest = UpdateCrlRequest
 
@@ -319,46 +237,12 @@ class SignCertificateRequest(google.protobuf.message.Message):
         not_before: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         not_after: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing.Literal[
-            "_not_after",
-            b"_not_after",
-            "_not_before",
-            b"_not_before",
-            "not_after",
-            b"not_after",
-            "not_before",
-            b"not_before",
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing.Literal[
-            "_not_after",
-            b"_not_after",
-            "_not_before",
-            b"_not_before",
-            "csr",
-            b"csr",
-            "issuer",
-            b"issuer",
-            "not_after",
-            b"not_after",
-            "not_before",
-            b"not_before",
-            "secret",
-            b"secret",
-        ],
-    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_not_after", b"_not_after", "_not_before", b"_not_before", "not_after", b"not_after", "not_before", b"not_before"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_not_after", b"_not_after", "_not_before", b"_not_before", "csr", b"csr", "issuer", b"issuer", "not_after", b"not_after", "not_before", b"not_before", "secret", b"secret"]) -> None: ...
     @typing.overload
-    def WhichOneof(
-        self, oneof_group: typing.Literal["_not_after", b"_not_after"]
-    ) -> typing.Literal["not_after"] | None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_not_after", b"_not_after"]) -> typing.Literal["not_after"] | None: ...
     @typing.overload
-    def WhichOneof(
-        self, oneof_group: typing.Literal["_not_before", b"_not_before"]
-    ) -> typing.Literal["not_before"] | None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_not_before", b"_not_before"]) -> typing.Literal["not_before"] | None: ...
 
 global___SignCertificateRequest = SignCertificateRequest
 
@@ -385,10 +269,13 @@ class RevokeCertificateRequest(google.protobuf.message.Message):
     SECRET_FIELD_NUMBER: builtins.int
     SERIAL_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
+    INVALIDITY_DATE_FIELD_NUMBER: builtins.int
     issuer: builtins.str
     secret: builtins.str
     serial: builtins.str
     reason: global___RevocationReason.ValueType
+    @property
+    def invalidity_date(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     def __init__(
         self,
         *,
@@ -396,28 +283,14 @@ class RevokeCertificateRequest(google.protobuf.message.Message):
         secret: builtins.str = ...,
         serial: builtins.str = ...,
         reason: global___RevocationReason.ValueType | None = ...,
+        invalidity_date: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
-    def HasField(
-        self, field_name: typing.Literal["_reason", b"_reason", "reason", b"reason"]
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing.Literal[
-            "_reason",
-            b"_reason",
-            "issuer",
-            b"issuer",
-            "reason",
-            b"reason",
-            "secret",
-            b"secret",
-            "serial",
-            b"serial",
-        ],
-    ) -> None: ...
-    def WhichOneof(
-        self, oneof_group: typing.Literal["_reason", b"_reason"]
-    ) -> typing.Literal["reason"] | None: ...
+    def HasField(self, field_name: typing.Literal["_invalidity_date", b"_invalidity_date", "_reason", b"_reason", "invalidity_date", b"invalidity_date", "reason", b"reason"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_invalidity_date", b"_invalidity_date", "_reason", b"_reason", "invalidity_date", b"invalidity_date", "issuer", b"issuer", "reason", b"reason", "secret", b"secret", "serial", b"serial"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_invalidity_date", b"_invalidity_date"]) -> typing.Literal["invalidity_date"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_reason", b"_reason"]) -> typing.Literal["reason"] | None: ...
 
 global___RevokeCertificateRequest = RevokeCertificateRequest
 
@@ -452,18 +325,12 @@ class ListCertificatesResponse(google.protobuf.message.Message):
 
     CERTIFICATES_FIELD_NUMBER: builtins.int
     @property
-    def certificates(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
-        builtins.str
-    ]: ...
+    def certificates(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         certificates: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing.Literal["certificates", b"certificates"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["certificates", b"certificates"]) -> None: ...
 
 global___ListCertificatesResponse = ListCertificatesResponse

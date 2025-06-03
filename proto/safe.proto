@@ -96,6 +96,7 @@ message RevokeCertificateRequest {
   string secret = 2;
   string serial = 3;
   optional RevocationReason reason = 4;
+  optional google.protobuf.Timestamp invalidity_date = 5;
 }
 
 message RevokeCertificateResponse {}

@@ -1916,6 +1916,7 @@ dependencies = [
  "tonic-build",
  "tonic-reflection",
  "tracing",
+ "url",
  "x509-parser",
  "zeroize",
 ]

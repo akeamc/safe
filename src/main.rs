@@ -1,10 +1,11 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 use clap::Parser;
 use safe::{State, grpc::SafeService};
 use sqlx::{Sqlite, SqlitePool, migrate::MigrateDatabase};
 use tokio::{signal, task::JoinSet};
 use tokio_util::sync::CancellationToken;
+use url::Url;
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -17,6 +18,12 @@ struct Args {
 
     #[clap(long, env)]
     database_url: String,
+
+    /// URL that the public HTTP server will be accessible at,
+    /// used to specify the CRL URl in the certificates and
+    /// CRLs.
+    #[clap(long, env)]
+    public_http_url: Url,
 }
 
 #[tokio::main]
@@ -27,6 +34,7 @@ async fn main() -> anyhow::Result<()> {
         http_addr,
         grpc_addr,
         database_url,
+        public_http_url,
     } = Args::parse();
 
     if !Sqlite::database_exists(&database_url).await? {
@@ -39,7 +47,10 @@ async fn main() -> anyhow::Result<()> {
 
     sqlx::migrate!().run(&db).await?;
 
-    let state = State { db };
+    let state = State {
+        db,
+        public_http_url: Arc::new(public_http_url),
+    };
     let cancel_token = CancellationToken::new();
 
     let svc = SafeService {

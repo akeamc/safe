@@ -5,7 +5,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use crate::State;
+use crate::{State, issuer::IssuerIdentifier};
 
 #[derive(Debug, thiserror::Error)]
 enum CrlError {
@@ -29,7 +29,7 @@ impl IntoResponse for CrlError {
     }
 }
 
-async fn crl(state: State, Path(issuer): Path<String>) -> Result<Response, CrlError> {
+async fn crl(state: State, Path(issuer): Path<IssuerIdentifier>) -> Result<Response, CrlError> {
     struct Row {
         crl: Option<Vec<u8>>,
     }
@@ -44,7 +44,10 @@ async fn crl(state: State, Path(issuer): Path<String>) -> Result<Response, CrlEr
     Ok(([(header::CONTENT_TYPE, "application/pkix-crl")], crl).into_response())
 }
 
-async fn issuer_pem(state: State, Path(issuer): Path<String>) -> Result<Response, CrlError> {
+async fn issuer_pem(
+    state: State,
+    Path(issuer): Path<IssuerIdentifier>,
+) -> Result<Response, CrlError> {
     struct Row {
         cert: String,
     }
