@@ -2,6 +2,11 @@ version = 1
 revision = 2
 requires-python = ">=3.12"
 
+[manifest]
+members = [
+    "safe",
+]
+
 [[package]]
 name = "cffi"
 version = "1.17.1"
@@ -170,7 +175,7 @@ wheels = [
 [[package]]
 name = "safe"
 version = "0.1.0"
-source = { editable = "." }
+source = { editable = "safe-py" }
 dependencies = [
     { name = "cryptography" },
 ]
