@@ -186,7 +186,7 @@ requires-dist = [{ name = "cryptography", specifier = ">=45.0.3" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "grpcio-tools", specifier = "==1.71.0" },
+    { name = "grpcio-tools", specifier = "<=1.71.0" },
     { name = "mypy-protobuf", specifier = ">=3.6.0" },
 ]
 

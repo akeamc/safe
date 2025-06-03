@@ -5,7 +5,7 @@ import warnings
 
 from safe.stubs import safe_pb2 as safe_dot_stubs_dot_safe__pb2
 
-GRPC_GENERATED_VERSION = '1.72.1'
+GRPC_GENERATED_VERSION = '1.71.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
