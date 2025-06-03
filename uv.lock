@@ -175,7 +175,7 @@ wheels = [
 [[package]]
 name = "safe"
 version = "0.1.0"
-source = { editable = "safe-py" }
+source = { virtual = "safe-py" }
 dependencies = [
     { name = "cryptography" },
 ]

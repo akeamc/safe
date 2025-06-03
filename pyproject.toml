@@ -1,2 +1,6 @@
 [tool.uv.workspace]
 members = ["safe-py"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
