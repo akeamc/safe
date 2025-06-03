@@ -8,7 +8,10 @@ use proto::{
     UpdateCrlResponse,
     safe_server::{Safe, SafeServer},
 };
-use rcgen::{CertificateParams, CertificateSigningRequestParams, IsCa, KeyPair, PublicKeyData};
+use rcgen::{
+    CertificateParams, CertificateSigningRequestParams, ExtendedKeyUsagePurpose, IsCa, KeyPair,
+    KeyUsagePurpose, PublicKeyData,
+};
 use rustls_pki_types::CertificateDer;
 use sqlx::{SqlitePool, types::Json};
 use time::{Duration, OffsetDateTime};
@@ -131,9 +134,6 @@ async fn sign_cert(
 
     let serial_number = CertSerial::random();
 
-    csr.params.serial_number = Some(serial_number.into());
-    csr.params.is_ca = IsCa::ExplicitNoCa;
-
     let not_before = not_before
         .map(protobuf_to_time)
         .unwrap_or_else(OffsetDateTime::now_utc);
@@ -145,9 +145,17 @@ async fn sign_cert(
         return Err(SignCertError::InvalidTimestamps);
     }
 
+    csr.params.serial_number = Some(serial_number.into());
     csr.params.not_before = not_before;
     csr.params.not_after = not_after;
+    csr.params.is_ca = IsCa::ExplicitNoCa;
+    csr.params.use_authority_key_identifier_extension = true;
     csr.params.crl_distribution_points = vec![state.crl_distribution_point(&issuer)];
+    csr.params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
+    csr.params.extended_key_usages = vec![
+        ExtendedKeyUsagePurpose::ServerAuth,
+        ExtendedKeyUsagePurpose::ClientAuth,
+    ];
 
     let der = csr
         .signed_by(&ca, &ca_key)
