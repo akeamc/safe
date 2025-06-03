@@ -68,7 +68,25 @@ pub fn parse_colon_separated_hex(s: &str, buf: &mut [u8]) -> Result<(), ParseHex
     Ok(())
 }
 
-pub fn protobuf_to_time(timestamp: Timestamp) -> OffsetDateTime {
-    let nanos = i128::from(timestamp.seconds) * 1_000_000_000 + i128::from(timestamp.nanos);
-    OffsetDateTime::from_unix_timestamp_nanos(nanos).unwrap()
+pub(crate) trait IntoTimeType {
+    type Out;
+
+    fn into_time_type(self) -> Self::Out;
+}
+
+impl IntoTimeType for Timestamp {
+    type Out = OffsetDateTime;
+
+    fn into_time_type(self) -> Self::Out {
+        let nanos = i128::from(self.seconds) * 1_000_000_000 + i128::from(self.nanos);
+        OffsetDateTime::from_unix_timestamp_nanos(nanos).unwrap()
+    }
+}
+
+impl IntoTimeType for prost_types::Duration {
+    type Out = time::Duration;
+
+    fn into_time_type(self) -> Self::Out {
+        time::Duration::seconds(self.seconds) + time::Duration::nanoseconds(i64::from(self.nanos))
+    }
 }

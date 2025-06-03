@@ -6,6 +6,7 @@ isort:skip_file
 import builtins
 import collections.abc
 import google.protobuf.descriptor
+import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
@@ -217,32 +218,58 @@ class SignCertificateRequest(google.protobuf.message.Message):
 
     ISSUER_FIELD_NUMBER: builtins.int
     SECRET_FIELD_NUMBER: builtins.int
-    CSR_FIELD_NUMBER: builtins.int
-    NOT_BEFORE_FIELD_NUMBER: builtins.int
-    NOT_AFTER_FIELD_NUMBER: builtins.int
+    SPKI_FIELD_NUMBER: builtins.int
+    DER_FIELD_NUMBER: builtins.int
+    COMMON_NAME_FIELD_NUMBER: builtins.int
+    NOT_BEFORE_OFFSET_FIELD_NUMBER: builtins.int
+    NAF_FIELD_NUMBER: builtins.int
+    TTL_FIELD_NUMBER: builtins.int
     issuer: builtins.str
     secret: builtins.str
-    csr: builtins.bytes
-    """DER-encoded certificate signing request."""
+    spki: builtins.str
+    """SubjectPublicKeyInfo in PEM format, useful when you do not have a proper
+    CSR but just a public key.
+    """
+    der: builtins.bytes
+    """DER-encoded X.509 certificate signing request."""
+    common_name: builtins.str
     @property
-    def not_before(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    def not_before_offset(self) -> google.protobuf.duration_pb2.Duration:
+        """Duration with which to offset the not_before time to account for clock skew.
+        Default is -30 seconds, menaing that the certificate's validity period starts
+        30 seconds _before_ the time of issuance.
+        """
+
     @property
-    def not_after(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    def naf(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Standard notAfter time, which is the time at which the certificate expires."""
+
+    @property
+    def ttl(self) -> google.protobuf.duration_pb2.Duration:
+        """Time to live for the certificate. Must be positive."""
+
     def __init__(
         self,
         *,
         issuer: builtins.str = ...,
         secret: builtins.str = ...,
-        csr: builtins.bytes = ...,
-        not_before: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        not_after: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        spki: builtins.str = ...,
+        der: builtins.bytes = ...,
+        common_name: builtins.str | None = ...,
+        not_before_offset: google.protobuf.duration_pb2.Duration | None = ...,
+        naf: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        ttl: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_not_after", b"_not_after", "_not_before", b"_not_before", "not_after", b"not_after", "not_before", b"not_before"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_not_after", b"_not_after", "_not_before", b"_not_before", "csr", b"csr", "issuer", b"issuer", "not_after", b"not_after", "not_before", b"not_before", "secret", b"secret"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_common_name", b"_common_name", "_not_before_offset", b"_not_before_offset", "common_name", b"common_name", "csr", b"csr", "der", b"der", "naf", b"naf", "not_after", b"not_after", "not_before_offset", b"not_before_offset", "spki", b"spki", "ttl", b"ttl"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_common_name", b"_common_name", "_not_before_offset", b"_not_before_offset", "common_name", b"common_name", "csr", b"csr", "der", b"der", "issuer", b"issuer", "naf", b"naf", "not_after", b"not_after", "not_before_offset", b"not_before_offset", "secret", b"secret", "spki", b"spki", "ttl", b"ttl"]) -> None: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_not_after", b"_not_after"]) -> typing.Literal["not_after"] | None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_common_name", b"_common_name"]) -> typing.Literal["common_name"] | None: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_not_before", b"_not_before"]) -> typing.Literal["not_before"] | None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_not_before_offset", b"_not_before_offset"]) -> typing.Literal["not_before_offset"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["csr", b"csr"]) -> typing.Literal["spki", "der"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["not_after", b"not_after"]) -> typing.Literal["naf", "ttl"] | None: ...
 
 global___SignCertificateRequest = SignCertificateRequest
 

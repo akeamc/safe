@@ -4,4 +4,4 @@ _Safe_ is a gRPC-managed PKI server that uses [Shamir's secret sharing](https://
 
 ## Management
 
-The management interface is gRPC-based, and the specification (with docs) can be found in the `./proto` directory. There is a Python client available in `./safe-py`.
+The management interface, inspired by [HCP Vault's PKI engine](https://developer.hashicorp.com/vault/api-docs/secret/pki), is gRPC-based, and the specification (with docs) can be found in the `./proto` directory. There is a Python client available in `./safe-py`.

@@ -7,6 +7,7 @@ use url::Url;
 
 use crate::issuer::IssuerIdentifier;
 
+pub mod csr;
 pub mod grpc;
 pub mod http;
 pub mod issuer;

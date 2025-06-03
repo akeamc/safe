@@ -9,8 +9,8 @@ use proto::{
     safe_server::{Safe, SafeServer},
 };
 use rcgen::{
-    CertificateParams, CertificateSigningRequestParams, ExtendedKeyUsagePurpose, IsCa, KeyPair,
-    KeyUsagePurpose, PublicKeyData,
+    CertificateParams, DistinguishedName, ExtendedKeyUsagePurpose, IsCa, KeyPair, KeyUsagePurpose,
+    PublicKeyData,
 };
 use rustls_pki_types::CertificateDer;
 use sqlx::{SqlitePool, types::Json};
@@ -20,17 +20,22 @@ use tonic::{Code, Request, Response, Status};
 use tracing::warn;
 use x509_parser::pem::parse_x509_pem;
 
+const DEFAULT_NBF_OFFSET: Duration = Duration::seconds(-30);
+const DEFAULT_TTL: Duration = Duration::days(90);
+
 use crate::{
     State,
-    grpc::proto::{RevokeCertificateRequest, RevokeCertificateResponse},
+    csr::{ParseCsrError, parse_csr},
+    grpc::proto::{
+        RevokeCertificateRequest, RevokeCertificateResponse, sign_certificate_request::NotAfter,
+    },
     issuer::{
         CertSerial, GetIssuerKeyError, IssuerIdentifier, IssuerIdentifierError, ParseSerialError,
         get_issuer_aead_container, get_issuer_key, insert_cert,
     },
     key::{self, SplitError},
-    revocation::set_cert_revocation,
-    revocation::{MakeCrlError, make_crl},
-    util::protobuf_to_time,
+    revocation::{MakeCrlError, make_crl, set_cert_revocation},
+    util::IntoTimeType,
 };
 
 pub mod proto;
@@ -82,8 +87,10 @@ fn decode_certified_key(
 
 #[derive(Debug, thiserror::Error)]
 enum SignCertError {
-    #[error("invalid CSR data")]
-    InvalidCsr,
+    #[error(transparent)]
+    ParseCsr(#[from] ParseCsrError),
+    #[error("missing CSR")]
+    MissingCsr,
     #[error("database error")]
     Db(#[from] sqlx::Error),
     #[error("crypto error")]
@@ -99,7 +106,8 @@ enum SignCertError {
 impl From<SignCertError> for Status {
     fn from(err: SignCertError) -> Self {
         let code = match err {
-            SignCertError::InvalidCsr => Code::InvalidArgument,
+            SignCertError::ParseCsr(_) => Code::InvalidArgument,
+            SignCertError::MissingCsr => Code::InvalidArgument,
             SignCertError::Db(_) => Code::Internal,
             SignCertError::Crypto => Code::Internal,
             SignCertError::GetIssuerKeyError(inner) => return inner.into(),
@@ -111,54 +119,75 @@ impl From<SignCertError> for Status {
     }
 }
 
+fn default_cert_params() -> CertificateParams {
+    let mut params = CertificateParams::default();
+    // all defaults about CertificateParams are sensible except for the distinguished name;
+    // by default it's set to "CN=rcgen self signed certificate" which is not really what we want
+    params.distinguished_name = DistinguishedName::new();
+    params
+}
+
 async fn sign_cert(
     state: &State,
     req: SignCertificateRequest,
 ) -> Result<SignCertificateResponse, SignCertError> {
-    const DEFAULT_VALIDITY: Duration = Duration::days(90);
-
     let SignCertificateRequest {
         issuer,
         csr,
         secret,
-        not_before,
+        not_before_offset,
         not_after,
+        common_name,
     } = req;
 
-    let mut csr = CertificateSigningRequestParams::from_der(&csr.into())
-        .map_err(|_| SignCertError::InvalidCsr)?;
+    let (cert, public_key) = parse_csr(csr.ok_or(SignCertError::MissingCsr)?)?;
+    let mut cert = cert.unwrap_or_else(default_cert_params);
     let issuer = IssuerIdentifier::from_str(&issuer)?;
 
     let mut conn = state.db.begin().await?;
     let (ca, ca_key) = get_issuer_key(&mut *conn, &issuer, secret).await?;
 
-    let serial_number = CertSerial::random();
-
-    let not_before = not_before
-        .map(protobuf_to_time)
-        .unwrap_or_else(OffsetDateTime::now_utc);
-    let not_after = not_after
-        .map(protobuf_to_time)
-        .unwrap_or_else(|| not_before + DEFAULT_VALIDITY);
+    let not_before = OffsetDateTime::now_utc()
+        + not_before_offset.map_or(DEFAULT_NBF_OFFSET, IntoTimeType::into_time_type);
+    let not_after = match not_after {
+        Some(NotAfter::Naf(ts)) => ts.into_time_type(),
+        Some(NotAfter::Ttl(ttl)) => not_before + ttl.into_time_type(),
+        None => not_before + DEFAULT_TTL,
+    };
 
     if not_before > not_after {
         return Err(SignCertError::InvalidTimestamps);
     }
 
-    csr.params.serial_number = Some(serial_number.into());
-    csr.params.not_before = not_before;
-    csr.params.not_after = not_after;
-    csr.params.is_ca = IsCa::ExplicitNoCa;
-    csr.params.use_authority_key_identifier_extension = true;
-    csr.params.crl_distribution_points = vec![state.crl_distribution_point(&issuer)];
-    csr.params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
-    csr.params.extended_key_usages = vec![
+    let distinguished_name = {
+        let mut dn = DistinguishedName::new();
+        if let Some(common_name) = common_name {
+            dn.push(rcgen::DnType::CommonName, common_name);
+        }
+
+        Some(dn).filter(|dn| dn.iter().count() > 0)
+    };
+
+    let serial_number = CertSerial::random();
+
+    if let Some(dn) = distinguished_name {
+        cert.distinguished_name = dn;
+    }
+
+    cert.serial_number = Some(serial_number.into());
+    cert.not_before = not_before;
+    cert.not_after = not_after;
+    cert.is_ca = IsCa::ExplicitNoCa;
+    cert.crl_distribution_points = vec![state.crl_distribution_point(&issuer)];
+    cert.use_authority_key_identifier_extension = true;
+    cert.key_usages = vec![KeyUsagePurpose::DigitalSignature];
+    cert.extended_key_usages = vec![
         ExtendedKeyUsagePurpose::ServerAuth,
         ExtendedKeyUsagePurpose::ClientAuth,
     ];
 
-    let der = csr
-        .signed_by(&ca, &ca_key)
+    let der = cert
+        .signed_by(&public_key, &ca, &ca_key)
         .map_err(|_| SignCertError::Crypto)?
         .der()
         .to_vec();
@@ -234,7 +263,7 @@ async fn revoke_cert(
         &issuer,
         revocation_time,
         revocation_code,
-        invalidity_date.map(protobuf_to_time),
+        invalidity_date.map(IntoTimeType::into_time_type),
     )
     .await?;
 

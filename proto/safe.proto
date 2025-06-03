@@ -3,6 +3,7 @@ syntax = "proto3";
 package safe;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
 
 service Safe {
   rpc ListIssuers (ListIssuersRequest) returns (IssuerList);
@@ -68,10 +69,28 @@ message UpdateCrlResponse {}
 message SignCertificateRequest {
   string issuer = 1;
   string secret = 2;
-  // DER-encoded certificate signing request.
-  bytes csr = 3;
-  optional google.protobuf.Timestamp not_before = 4;
-  optional google.protobuf.Timestamp not_after = 5;
+
+  oneof csr {
+    // SubjectPublicKeyInfo in PEM format, useful when you do not have a proper
+    // CSR but just a public key.
+    string spki = 7;
+    // DER-encoded X.509 certificate signing request.
+    bytes der = 3;
+  }
+
+  optional string common_name = 8;
+
+  // Duration with which to offset the not_before time to account for clock skew.
+  // Default is -30 seconds, menaing that the certificate's validity period starts
+  // 30 seconds _before_ the time of issuance.
+  optional google.protobuf.Duration not_before_offset = 4;
+
+  oneof not_after {
+    // Standard notAfter time, which is the time at which the certificate expires.
+    google.protobuf.Timestamp naf = 5;
+    // Time to live for the certificate. Must be positive.
+    google.protobuf.Duration ttl = 6;
+  }
 }
 
 message SignCertificateResponse {
