@@ -7,6 +7,10 @@ authors = [{ name = "Åke Amcoff", email = "ake@amcoff.net" }]
 requires-python = ">=3.12"
 dependencies = ["cryptography>=45.0.3"]
 
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
 [tool.ruff]
 lint.extend-select = ["I"]
 extend-exclude = ["safe_pb2_grpc.py", "safe_pb2.py", "safe_pb2.pyi"]
@@ -17,6 +21,7 @@ venv = ".venv"
 ignore = [
     "src/safe/stubs/safe_pb2_grpc.py",
     "src/safe/stubs/safe_pb2.py",
+    "src/safe/stubs/safe_pb2.pyi",
 ] # Ignore generated files
 
 [dependency-groups]

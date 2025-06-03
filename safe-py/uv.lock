@@ -170,7 +170,7 @@ wheels = [
 [[package]]
 name = "safe"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
 ]
